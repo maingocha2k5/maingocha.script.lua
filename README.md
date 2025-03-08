@@ -1,0 +1,1 @@
+# maingocha.script.lua
