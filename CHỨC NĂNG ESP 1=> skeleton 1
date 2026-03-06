@@ -1,0 +1,164 @@
+-- ===== AUTO SKELETON - PASTE LÀ CHẠY =====
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local runService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
+
+local drawings = {}
+local playerData = {}
+
+local r15Pairs = {
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"},
+}
+
+local r6Pairs = {
+    {"Head", "Torso"},
+    {"Torso", "Left Arm"},
+    {"Left Arm", "Left Leg"},
+    {"Torso", "Right Arm"},
+    {"Right Arm", "Right Leg"},
+    {"Torso", "Left Leg"},
+    {"Torso", "Right Leg"},
+}
+
+local function getPart(character, name)
+    return character and character:FindFirstChild(name)
+end
+
+local function isR15(character)
+    local count = 0
+    for _, pair in ipairs(r15Pairs) do
+        if getPart(character, pair[1]) and getPart(character, pair[2]) then
+            count = count + 1
+        end
+    end
+    return count >= 5
+end
+
+local function isR6(character)
+    return getPart(character, "Head") and getPart(character, "Torso") and
+           getPart(character, "Left Arm") and getPart(character, "Right Arm") and
+           getPart(character, "Left Leg") and getPart(character, "Right Leg")
+end
+
+local function addPlayer(plr)
+    if plr == player then return end
+    local character = plr.Character
+    if not character then return end
+    
+    local pairs
+    if isR15(character) then
+        pairs = r15Pairs
+    elseif isR6(character) then
+        pairs = r6Pairs
+    else
+        return
+    end
+    
+    local lines = {}
+    for _, pair in ipairs(pairs) do
+        local p1 = getPart(character, pair[1])
+        local p2 = getPart(character, pair[2])
+        if p1 and p2 then
+            local line = Drawing.new("Line")
+            line.Color = Color3.new(1,1,1)
+            line.Thickness = 2
+            line.Visible = true
+            table.insert(drawings, line)
+            table.insert(lines, {line = line, p1 = p1, p2 = p2})
+        end
+    end
+    
+    local head = getPart(character, "Head")
+    local circle
+    if head then
+        circle = Drawing.new("Circle")
+        circle.Color = Color3.new(1,1,1)
+        circle.Thickness = 2
+        circle.NumSides = 20
+        circle.Filled = false
+        circle.Radius = 12
+        circle.Visible = true
+        table.insert(drawings, circle)
+    end
+    
+    playerData[plr] = {
+        lines = lines,
+        circle = circle,
+        head = head,
+        character = character
+    }
+end
+
+-- Add existing players
+for _, plr in ipairs(Players:GetPlayers()) do
+    addPlayer(plr)
+end
+
+-- Listen for new players
+Players.PlayerAdded:Connect(function(plr)
+    if plr == player then return end
+    plr.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        addPlayer(plr)
+    end)
+end)
+
+-- Render loop
+runService.RenderStepped:Connect(function()
+    for plr, data in pairs(playerData) do
+        local character = data.character
+        if not character or not character.Parent then
+            for _, item in ipairs(data.lines) do
+                item.line.Visible = false
+            end
+            if data.circle then data.circle.Visible = false end
+            playerData[plr] = nil
+            continue
+        end
+        
+        for _, item in ipairs(data.lines) do
+            if item.p1 and item.p1.Parent and item.p2 and item.p2.Parent then
+                local v1, on1 = camera:WorldToViewportPoint(item.p1.Position)
+                local v2, on2 = camera:WorldToViewportPoint(item.p2.Position)
+                if on1 or on2 then
+                    item.line.From = Vector2.new(v1.X, v1.Y)
+                    item.line.To = Vector2.new(v2.X, v2.Y)
+                    item.line.Visible = true
+                else
+                    item.line.Visible = false
+                end
+            else
+                item.line.Visible = false
+            end
+        end
+        
+        if data.circle and data.head and data.head.Parent then
+            local pos, onScreen = camera:WorldToViewportPoint(data.head.Position)
+            if onScreen then
+                local dist = (data.head.Position - camera.CFrame.Position).Magnitude
+                local radius = math.clamp(20 * (10 / math.max(dist,1)), 4, 16)
+                data.circle.Radius = radius
+                data.circle.Position = Vector2.new(pos.X, pos.Y)
+                data.circle.Visible = true
+            else
+                data.circle.Visible = false
+            end
+        end
+    end
+end)
+
+print("✅ Skeleton đang chạy - Tự động hiện trên tất cả player")
